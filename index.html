@@ -24,11 +24,27 @@
       width: 100%;
     }
 
-    /* Opacity slider container */
-    .opacity-control {
+    .info-box {
       background: white;
       padding: 8px;
       font-family: sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .info-box table {
+      border-collapse: collapse;
+    }
+
+    .info-box th {
+      text-align: left;
+      font-weight: bold;
+      padding-right: 8px;
+      white-space: nowrap;
+    }
+
+    .info-box td {
+      padding-left: 4px;
     }
   </style>
 </head>
@@ -60,7 +76,7 @@
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors, © CARTO'
     }
-  ).addTo(map); // ✅ always on
+  ).addTo(map);
 
   /* ----------------------------------
      3. Local tiles (overlay)
@@ -75,24 +91,34 @@
   const regionLayer = L.geoJSON(null, {
    style: {
     color: "black",
-    weight: 2,
+    weight: 3,
     opacity: 1,
     dashArray: "6, 6",
-    fillOpacity: 0
+    fillOpacity: 0.01
    },
 
    onEachFeature: function (feature, layer) {
-    if (feature.properties && feature.properties.name) {
-      layer.bindPopup(feature.properties.name);
+    if (feature.properties) {
+      let popupContent = '<div class="info-box"><table>';
+
+      for (const key in feature.properties) {
+        popupContent += `
+          <tr>
+            <th>${key}</th>
+            <td>${feature.properties[key]}</td>
+          </tr>
+        `;
+      }
+      popupContent += "</table></div>";
+      layer.bindPopup(popupContent);
     }
-   }
+  }
   }).addTo(map);
 
   fetch('data/kosciolek_region.geojson')
    .then(response => response.json())
    .then(data => {
      regionLayer.addData(data);
-     map.fitBounds(regionLayer.getBounds());
    })
    .catch(error => {
      console.error("Error loading GeoJSON:", error);
@@ -105,7 +131,7 @@
     null, // no base-layer switcher
     {
       "Borek Stary (1851)": localTiles,
-      "Kosciolek Alphabetisches Verzeichnis": regionLayer
+      "Kosciolek Alphabetisches Verzeichnis (1851)": regionLayer
     },
     { collapsed: false }
   ).addTo(map);
@@ -116,7 +142,7 @@
   const opacityControl = L.control({ position: 'topright' });
 
   opacityControl.onAdd = function () {
-    const div = L.DomUtil.create('div', 'opacity-control');
+    const div = L.DomUtil.create('div', 'opacity-control info-box');
 
     div.innerHTML = `
       <label>
