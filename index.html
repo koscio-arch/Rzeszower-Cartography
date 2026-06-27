@@ -65,15 +65,38 @@
   /* ----------------------------------
      3. Local tiles (overlay)
      ---------------------------------- */
-  const localTiles = L.tileLayer(
-    'borek_tiles/{z}/{x}/{y}.png',
-    {
-      minZoom: 12,
-      maxZoom: 18,
-      opacity: 0.8, // starting transparency
-      attribution: '© Archiwum Państwowe w Przemyślu'
+  const localTiles = L.tileLayer('borek_tiles/{z}/{x}/{y}.png', {
+    minZoom: 12,
+    maxZoom: 18,
+    opacity: 0.8, // starting transparency
+    attribution: '© Archiwum Państwowe w Przemyślu'
+  }).addTo(map); // start ON (can be toggled)
+  
+  const regionLayer = L.geoJSON(null, {
+   style: {
+    color: "black",
+    weight: 2,
+    opacity: 1,
+    dashArray: "6, 6",
+    fillOpacity: 0
+   },
+
+   onEachFeature: function (feature, layer) {
+    if (feature.properties && feature.properties.name) {
+      layer.bindPopup(feature.properties.name);
     }
-  ).addTo(map); // start ON (can be toggled)
+   }
+  }).addTo(map);
+
+  fetch('data/kosciolek_region.geojson')
+   .then(response => response.json())
+   .then(data => {
+     regionLayer.addData(data);
+     map.fitBounds(regionLayer.getBounds());
+   })
+   .catch(error => {
+     console.error("Error loading GeoJSON:", error);
+   });
 
   /* ----------------------------------
      4. Layer control (overlay only)
@@ -81,7 +104,8 @@
   L.control.layers(
     null, // no base-layer switcher
     {
-      "Borek Stary (1851)": localTiles
+      "Borek Stary (1851)": localTiles,
+      "Kosciolek Alphabetisches Verzeichnis": regionLayer
     },
     { collapsed: false }
   ).addTo(map);
