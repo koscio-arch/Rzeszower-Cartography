@@ -1,50 +1,197 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
   <meta charset="utf-8" />
-  <title>Leaflet OSM + Local Tiles Overlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Kataster Galicyjski 1851</title>
 
-  <!-- Leaflet CSS -->
+  <!-- Leaflet core -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
+    crossorigin="anonymous"
   />
 
-  <!-- Ensure referrer is sent (important for OSM) -->
-  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <!-- Type: Cormorant Garamond for ledger-style headers, Inter for UI/body text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
 
   <style>
+    :root {
+      /* ---- Design tokens ---- */
+      --parchment: #ede3c8;
+      --parchment-dim: rgba(43, 33, 24, 0.22);
+      --ink: #2b2118;
+      --brass: #9c7a3c;
+      --seal: #8c2f2b;
+      --slate: #3b5266;
+      --radius: 3px;
+      --shadow: 0 2px 10px rgba(43, 33, 24, 0.28);
+      --font-display: "Cormorant Garamond", Georgia, serif;
+      --font-body: "Inter", system-ui, -apple-system, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
     html, body {
       height: 100%;
       margin: 0;
+      font-family: var(--font-body);
+      color: var(--ink);
     }
 
     #map {
       height: 100%;
       width: 100%;
+      background: #dfe6e9;
     }
 
+    /* ---- Shared "instrument panel" chrome, reused by every custom control ---- */
+    .panel {
+      background: var(--parchment);
+      border: 1px solid var(--brass);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    /* ---- Title plaque (top-left) ---- */
+    .map-title {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 700;
+      padding: 10px 14px;
+      max-width: 220px;
+      pointer-events: none;
+    }
+    .map-title h1 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .map-title p {
+      margin: 4px 0 0;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--slate);
+    }
+
+    /* ---- Leaflet's built-in layer-control switcher, restyled to match ---- */
+    .leaflet-control-layers {
+      background: var(--parchment) !important;
+      border: 1px solid var(--brass) !important;
+      border-radius: var(--radius) !important;
+      box-shadow: var(--shadow) !important;
+      padding: 5px 10px 8px;
+    }
+    .leaflet-control-layers-overlays label {
+      font-size: 12.5px;
+      padding: 3px 0;
+      border-bottom: 1px dotted var(--parchment-dim);
+    }
+    .leaflet-control-layers-overlays label:last-child {
+      border-bottom: none;
+    }
+    .leaflet-control-layers input[type="checkbox"] {
+      accent-color: var(--seal);
+    }
+
+    /* ---- Opacity slider control ---- */
+    .opacity-control {
+      padding: 8px 10px 10px;
+      width: 176px;
+    }
+    .opacity-control__label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--slate);
+      margin-bottom: 6px;
+    }
+    .opacity-control__value {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--seal);
+    }
+    .opacity-control input[type="range"] {
+      width: 100%;
+      accent-color: var(--seal);
+    }
+
+    /* ---- Popups, styled as a card-catalog index card ---- */
+    .leaflet-popup-content-wrapper {
+      background: var(--parchment);
+      border: 1px solid var(--brass);
+      border-radius: 2px;
+      box-shadow: var(--shadow);
+    }
+    .leaflet-popup-tip {
+      background: var(--parchment);
+      border: 1px solid var(--brass);
+    }
     .info-box {
-      background: white;
-      padding: 8px;
-      font-family: sans-serif;
-      font-size: 13px;
-      line-height: 1.4;
+      position: relative;
+      padding: 10px 14px 8px 12px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      overflow: hidden;
     }
-
+    /* seal-red corner tab: the one deliberate flourish */
+    .info-box::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      border-style: solid;
+      border-width: 0 22px 22px 0;
+      border-color: transparent var(--seal) transparent transparent;
+    }
     .info-box table {
       border-collapse: collapse;
+      width: 100%;
     }
-
     .info-box th {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 12.5px;
       text-align: left;
-      font-weight: bold;
-      padding-right: 8px;
+      padding: 3px 10px 3px 0;
       white-space: nowrap;
+      border-bottom: 1px dashed var(--parchment-dim);
+    }
+    .info-box td {
+      padding: 3px 0;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      border-bottom: 1px dashed var(--parchment-dim);
+    }
+    .info-box tr:last-child th,
+    .info-box tr:last-child td {
+      border-bottom: none;
     }
 
-    .info-box td {
-      padding-left: 4px;
+    /* ---- GeoJSON load status (bottom-left, only visible while loading/on error) ---- */
+    .data-status {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 700;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .data-status--error {
+      border-color: var(--seal);
+      color: var(--seal);
     }
   </style>
 </head>
@@ -53,126 +200,152 @@
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="map-title panel">
+  <h1>Kataster Galicyjski · 1851</h1>
+  <p>Rzeszów | Podkarpackie Voivodeship</p>
+</div>
+
+<!-- Leaflet core -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
+  crossorigin="anonymous"
+></script>
 
 <script>
-  /* ----------------------------------
-     1. Initialize the map
-     ---------------------------------- */
-  const map = L.map('map', {
-    center: [49.9538, 22.1002], // Poland
+  'use strict';
+
+  /* ============================================================
+     Configuration — one place to change places, paths, and labels
+     ============================================================ */
+  const CONFIG = {
+    center: [49.9538, 22.1002], // Podkarpackie voivodeship, Poland
     zoom: 14,
     minZoom: 8,
-    maxZoom: 18
+    maxZoom: 18,
+    archiveAttribution: '&copy; Archiwum Państwowe w Przemyślu',
+    historicalLayers: [
+      { label: 'Borek Stary', url: 'borek_tiles/{z}/{x}/{y}.png' },
+      { label: 'Kielnarowa', url: 'kielnarowa_tiles/{z}/{x}/{y}.png' }
+    ],
+    geojson: {
+      url: 'data/kosciolek_region.geojson',
+      label: 'Kosciolek Alphabetisches Verzeichnis'
+    },
+    startOpacity: 0.8
+  };
+
+  /* ============================================================
+     1. Map + basemap
+     ============================================================ */
+  const map = L.map('map', {
+    center: CONFIG.center,
+    zoom: CONFIG.zoom,
+    minZoom: CONFIG.minZoom,
+    maxZoom: CONFIG.maxZoom,
+    zoomControl: false // re-added below, moved out of the way of the title plaque
   });
 
-  /* ----------------------------------
-     2. OpenStreetMap (ALWAYS ON)
-     ---------------------------------- */
-  const background = L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors, © CARTO'
-    }
-  ).addTo(map);
-
-  /* ----------------------------------
-     3. Local tiles (overlay)
-     ---------------------------------- */
-  const localTiles = L.tileLayer('borek_tiles/{z}/{x}/{y}.png', {
-    minZoom: 12,
-    maxZoom: 18,
-    opacity: 0.8, // starting transparency
-    attribution: '© Archiwum Państwowe w Przemyślu'
-  }).addTo(map); // start ON (can be toggled)
-  
-  const regionLayer = L.geoJSON(null, {
-   style: {
-    color: "black",
-    weight: 3,
-    opacity: 1,
-    dashArray: "6, 6",
-    fillOpacity: 0.01
-   },
-
-   onEachFeature: function (feature, layer) {
-    if (feature.properties) {
-      let popupContent = '<div class="info-box"><table>';
-
-      for (const key in feature.properties) {
-        popupContent += `
-          <tr>
-            <th>${key}</th>
-            <td>${feature.properties[key]}</td>
-          </tr>
-        `;
-      }
-      popupContent += "</table></div>";
-      layer.bindPopup(popupContent);
-    }
-  }
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors, &copy; CARTO'
   }).addTo(map);
 
-  fetch('data/kosciolek_region.geojson')
-   .then(response => response.json())
-   .then(data => {
-     regionLayer.addData(data);
-   })
-   .catch(error => {
-     console.error("Error loading GeoJSON:", error);
-   });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
 
-  /* ----------------------------------
-     4. Layer control (overlay only)
-     ---------------------------------- */
-  L.control.layers(
-    null, // no base-layer switcher
-    {
-      "Borek Stary (1851)": localTiles,
-      "Kosciolek Alphabetisches Verzeichnis (1851)": regionLayer
+  /* ============================================================
+     2. Historical tile overlays — one factory instead of two
+        near-identical blocks; add more layers via CONFIG only.
+     ============================================================ */
+  const historicalTiles = CONFIG.historicalLayers.map(({ label, url }) => ({
+    label,
+    instance: L.tileLayer(url, {
+      minZoom: 12,
+      maxZoom: 18,
+      opacity: CONFIG.startOpacity,
+      attribution: CONFIG.archiveAttribution
+    }).addTo(map)
+  }));
+
+  /* ============================================================
+     3. GeoJSON region overlay, with visible load/error feedback
+        instead of a console-only error
+     ============================================================ */
+  const regionLayer = L.geoJSON(null, {
+    style: {
+      color: '#2b2118',
+      weight: 3,
+      opacity: 1,
+      dashArray: '6, 6',
+      fillOpacity: 0.01
     },
-    { collapsed: false }
-  ).addTo(map);
+    onEachFeature(feature, layer) {
+      if (!feature.properties) return;
+      const rows = Object.entries(feature.properties)
+        .map(([key, value]) => `<tr><th>${key}</th><td>${value}</td></tr>`)
+        .join('');
+      layer.bindPopup(`<div class="info-box"><table>${rows}</table></div>`);
+    }
+  }).addTo(map);
 
-  /* ----------------------------------
-     5. Opacity slider control
-     ---------------------------------- */
+  const statusEl = document.createElement('div');
+  statusEl.className = 'data-status panel';
+  statusEl.textContent = 'Loading register…';
+  document.body.appendChild(statusEl);
+
+  fetch(CONFIG.geojson.url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return res.json();
+    })
+    .then((data) => {
+      regionLayer.addData(data);
+      statusEl.remove();
+    })
+    .catch((err) => {
+      console.error('Error loading GeoJSON:', err);
+      statusEl.textContent = `Could not load register: ${err.message}`;
+      statusEl.classList.add('data-status--error');
+    });
+
+  /* ============================================================
+     4. Layer control (overlays only — single basemap, so no
+        base-layer switcher is needed)
+     ============================================================ */
+  const overlays = {};
+  historicalTiles.forEach(({ label, instance }) => {
+    overlays[label] = instance;
+  });
+  overlays[CONFIG.geojson.label] = regionLayer;
+
+  L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+
+  /* ============================================================
+     5. Opacity slider — drives every historical layer at once,
+        so adding a layer to CONFIG is enough; no new wiring needed
+     ============================================================ */
   const opacityControl = L.control({ position: 'topright' });
 
   opacityControl.onAdd = function () {
-    const div = L.DomUtil.create('div', 'opacity-control info-box');
-
+    const div = L.DomUtil.create('div', 'opacity-control panel');
     div.innerHTML = `
-      <label>
-        overlay opacity<br>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          value="0.8"
-          id="opacityRange"
-        >
-      </label>
+      <div class="opacity-control__label">
+        <span>Overlay opacity</span>
+        <span class="opacity-control__value" id="opacityValue">${Math.round(CONFIG.startOpacity * 100)}%</span>
+      </div>
+      <input type="range" min="0" max="1" step="0.05" value="${CONFIG.startOpacity}" id="opacityRange">
     `;
-
-    // Prevent map dragging when interacting with slider
     L.DomEvent.disableClickPropagation(div);
-
     return div;
   };
 
   opacityControl.addTo(map);
 
-  /* ----------------------------------
-     6. Hook slider to tile opacity
-     ---------------------------------- */
-  document.addEventListener('input', function (e) {
-    if (e.target && e.target.id === 'opacityRange') {
-      localTiles.setOpacity(e.target.value);
-    }
+  document.getElementById('opacityRange').addEventListener('input', (e) => {
+    const opacity = parseFloat(e.target.value);
+    historicalTiles.forEach(({ instance }) => instance.setOpacity(opacity));
+    document.getElementById('opacityValue').textContent = `${Math.round(opacity * 100)}%`;
   });
 </script>
 
