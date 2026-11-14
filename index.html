@@ -32,6 +32,7 @@
       --seal: #8c2f2b;
       --slate: #3b5266;
       --radius: 3px;
+      --control-w: 198px; /* shared width: layer toggle box + opacity box */
       --shadow: 0 2px 10px rgba(43, 33, 24, 0.28);
       --font-display: "Cormorant Garamond", Georgia, serif;
       --font-body: "Inter", system-ui, -apple-system, sans-serif;
@@ -59,15 +60,21 @@
       box-shadow: var(--shadow);
     }
 
-    /* ---- Title plaque (top-left) ---- */
-    .map-title {
+    /* ---- Top-left stack: title plaque, then legend ---- */
+    .map-side {
       position: absolute;
       top: 12px;
       left: 12px;
       z-index: 700;
+      width: 232px;
+      max-height: calc(100vh - 70px);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none; /* map stays draggable around the panels */
+    }
+    .map-title {
       padding: 10px 14px;
-      max-width: 220px;
-      pointer-events: none;
     }
     .map-title h1 {
       margin: 0;
@@ -83,6 +90,80 @@
       color: var(--slate);
     }
 
+    /* ---- Legend (colors follow LEGEND.pdf) ---- */
+    .legend {
+      padding: 8px 14px 10px;
+      overflow-y: auto;
+      min-height: 0;
+      pointer-events: auto;
+    }
+    .legend summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      cursor: pointer;
+      list-style: none;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--slate);
+    }
+    .legend summary::-webkit-details-marker { display: none; }
+    .legend summary::after { content: "\2212"; }          /* minus when open */
+    .legend:not([open]) summary::after { content: "+"; }  /* plus when closed */
+    .legend__group {
+      list-style: none;
+      margin: 8px 0 0;
+      padding: 0;
+    }
+    .legend__group + .legend__group {
+      border-top: 3px double var(--brass);
+      margin-top: 8px;
+      padding-top: 8px;
+    }
+    .legend__heading {
+      margin: 0 0 2px;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--slate);
+    }
+    .legend li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 3px 0;
+    }
+    .legend__swatch {
+      flex: 0 0 22px;
+      height: 16px;
+      background: var(--c);
+      border: 1px solid rgba(43, 33, 24, 0.35);
+      border-radius: 1px;
+    }
+    /* diagonal stripe of the stone/brick and timber colors, as in the PDF */
+    .legend__swatch--mixed {
+      background: repeating-linear-gradient(
+        45deg,
+        rgb(160, 80, 92) 0 3px,
+        rgb(206, 180, 99) 3px 6px
+      );
+    }
+    .legend__de {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.1;
+    }
+    .legend__en {
+      display: block;
+      font-size: 10.5px;
+      line-height: 1.25;
+      color: var(--slate);
+    }
+
     /* ---- Leaflet's built-in layer-control switcher, restyled to match ---- */
     .leaflet-control-layers {
       background: var(--parchment) !important;
@@ -90,6 +171,8 @@
       border-radius: var(--radius) !important;
       box-shadow: var(--shadow) !important;
       padding: 5px 10px 8px;
+      box-sizing: border-box;
+      width: var(--control-w);
     }
     .leaflet-control-layers-overlays label {
       font-size: 12.5px;
@@ -99,6 +182,15 @@
     .leaflet-control-layers-overlays label:last-child {
       border-bottom: none;
     }
+    /* double rule separating the tile-layer group from the GeoJSON group */
+    .leaflet-control-layers-overlays label.group-end {
+      border-bottom: none;
+    }
+    .leaflet-control-layers-overlays label.group-start {
+      border-top: 3px double var(--brass);
+      margin-top: 4px;
+      padding-top: 6px;
+    }
     .leaflet-control-layers input[type="checkbox"] {
       accent-color: var(--seal);
     }
@@ -106,7 +198,8 @@
     /* ---- Opacity slider control ---- */
     .opacity-control {
       padding: 8px 10px 10px;
-      width: 176px;
+      box-sizing: border-box;
+      width: var(--control-w);
     }
     .opacity-control__label {
       display: flex;
@@ -200,9 +293,48 @@
 
 <div id="map"></div>
 
-<div class="map-title panel">
-  <h1>Kataster Galicyjski · 1851</h1>
-  <p>Rzeszów | Podkarpackie Voivodeship</p>
+<div class="map-side">
+
+  <div class="map-title panel">
+    <h1>Kataster Galicyjski · 1851</h1>
+    <p>Rzeszów | Podkarpackie Voivodeship</p>
+  </div>
+
+  <!-- Legend: one <li> per entry. Change a color via --c; add/remove rows freely. -->
+  <details class="legend panel" id="legend" open>
+    <summary>Legend</summary>
+
+    <ul class="legend__group">
+      <li class="legend__heading">Land use</li>
+      <li><span class="legend__swatch" style="--c: rgb(183, 161, 134)"></span>
+        <span><span class="legend__de">Acker</span><span class="legend__en">Arable land / plowland</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(146, 144, 114)"></span>
+        <span><span class="legend__de">Weide</span><span class="legend__en">Pasture</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(122, 120, 96)"></span>
+        <span><span class="legend__de">Weide mit Gestruppe</span><span class="legend__en">Pasture with brushwood</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(116, 135, 103)"></span>
+        <span><span class="legend__de">Wiese</span><span class="legend__en">Meadow / grassland</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(87, 137, 95)"></span>
+        <span><span class="legend__de">Obstgarten</span><span class="legend__en">Orchard / fruit garden</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(124, 115, 104)"></span>
+        <span><span class="legend__de">Niederwald</span><span class="legend__en">Coppice / low forest / brushwood</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(99, 92, 83)"></span>
+        <span><span class="legend__de">Gemischter Hochwald</span><span class="legend__en">Mixed high forest</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(118, 92, 69)"></span>
+        <span><span class="legend__de">Feldweg</span><span class="legend__en">Field path / farm road</span></span></li>
+    </ul>
+
+    <ul class="legend__group">
+      <li class="legend__heading">Structures</li>
+      <li><span class="legend__swatch" style="--c: rgb(160, 80, 92)"></span>
+        <span><span class="legend__de">Aus Stein oder Ziegel</span><span class="legend__en">Stone or brick structure</span></span></li>
+      <li><span class="legend__swatch" style="--c: rgb(206, 180, 99)"></span>
+        <span><span class="legend__de">Aus Holz</span><span class="legend__en">Timber or wooden structure</span></span></li>
+      <li><span class="legend__swatch legend__swatch--mixed"></span>
+        <span><span class="legend__de">Zum Teil Ziegel/Stein</span><span class="legend__en">Mixed construction</span></span></li>
+    </ul>
+  </details>
+
 </div>
 
 <!-- Leaflet core -->
@@ -223,15 +355,17 @@
     zoom: 14,
     minZoom: 8,
     maxZoom: 18,
+    cartoKey: 'cb1_4wg6_1_fcda6ff367b945d2161f317a',
     archiveAttribution: '&copy; Archiwum Państwowe w Przemyślu',
     historicalLayers: [
-      { label: 'Borek Stary', url: 'borek_tiles/{z}/{x}/{y}.png' },
-      { label: 'Kielnarowa', url: 'kielnarowa_tiles/{z}/{x}/{y}.png' }
+      { label: 'Borek Stary', url: 'borek_tiles/{z}/{x}/{y}.png', zIndex: 4  },
+      { label: 'Chmielnik', url: 'chmielnik_tiles/{z}/{x}/{y}.png', zIndex: 3  },
+      { label: 'Kielnarowa', url: 'kielnarowa_tiles/{z}/{x}/{y}.png', zIndex: 2 }
     ],
-    geojson: {
-      url: 'data/kosciolek_region.geojson',
-      label: 'Kosciolek Alphabetisches Verzeichnis'
-    },
+    geojsonLayers: [
+      { label: 'Kościółek Grundparzellen', url: 'data/kosciolek_region.geojson' },
+      { label: 'Koszela Grundparzellen', url: 'data/koszela_region.geojson' }
+    ],
     startOpacity: 0.8
   };
 
@@ -246,8 +380,9 @@
     zoomControl: false // re-added below, moved out of the way of the title plaque
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${CONFIG.cartoKey}`, {
     maxZoom: 19,
+    zIndex: 1,
     attribution: '&copy; OpenStreetMap contributors, &copy; CARTO'
   }).addTo(map);
 
@@ -258,9 +393,10 @@
      2. Historical tile overlays — one factory instead of two
         near-identical blocks; add more layers via CONFIG only.
      ============================================================ */
-  const historicalTiles = CONFIG.historicalLayers.map(({ label, url }) => ({
+  const historicalTiles = CONFIG.historicalLayers.map(({ label, url, zIndex }) => ({
     label,
     instance: L.tileLayer(url, {
+      zIndex,
       minZoom: 12,
       maxZoom: 18,
       opacity: CONFIG.startOpacity,
@@ -269,45 +405,56 @@
   }));
 
   /* ============================================================
-     3. GeoJSON region overlay, with visible load/error feedback
-        instead of a console-only error
+     3. GeoJSON overlays (all black), with visible load/error
+        feedback instead of a console-only error
      ============================================================ */
-  const regionLayer = L.geoJSON(null, {
-    style: {
-      color: '#2b2118',
-      weight: 3,
-      opacity: 1,
-      dashArray: '6, 6',
-      fillOpacity: 0.01
-    },
-    onEachFeature(feature, layer) {
-      if (!feature.properties) return;
-      const rows = Object.entries(feature.properties)
-        .map(([key, value]) => `<tr><th>${key}</th><td>${value}</td></tr>`)
-        .join('');
-      layer.bindPopup(`<div class="info-box"><table>${rows}</table></div>`);
-    }
-  }).addTo(map);
+  const regionLayers = CONFIG.geojsonLayers.map(({ label, url }) => {
+    const layer = L.geoJSON(null, {
+      style: {
+        color: '#2b2118',
+        weight: 3,
+        opacity: 1,
+        dashArray: '6, 6',
+        fillOpacity: 0.01
+      },
+      onEachFeature(feature, featureLayer) {
+        if (!feature.properties) return;
+        const rows = Object.entries(feature.properties)
+          .map(([key, value]) => `<tr><th>${key}</th><td>${value}</td></tr>`)
+          .join('');
+        featureLayer.bindPopup(`<div class="info-box"><table>${rows}</table></div>`);
+      }
+    }).addTo(map);
+    return { label, url, layer };
+  });
 
   const statusEl = document.createElement('div');
   statusEl.className = 'data-status panel';
   statusEl.textContent = 'Loading register…';
   document.body.appendChild(statusEl);
 
-  fetch(CONFIG.geojson.url)
-    .then((res) => {
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      return res.json();
-    })
-    .then((data) => {
-      regionLayer.addData(data);
+  Promise.allSettled(
+    regionLayers.map(({ label, url, layer }) =>
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+          return res.json();
+        })
+        .then((data) => layer.addData(data))
+        .catch((err) => {
+          throw new Error(`${label}: ${err.message}`);
+        })
+    )
+  ).then((results) => {
+    const failed = results.filter((r) => r.status === 'rejected');
+    if (!failed.length) {
       statusEl.remove();
-    })
-    .catch((err) => {
-      console.error('Error loading GeoJSON:', err);
-      statusEl.textContent = `Could not load register: ${err.message}`;
-      statusEl.classList.add('data-status--error');
-    });
+      return;
+    }
+    failed.forEach((f) => console.error('Error loading GeoJSON:', f.reason));
+    statusEl.textContent = `Could not load: ${failed.map((f) => f.reason.message).join('; ')}`;
+    statusEl.classList.add('data-status--error');
+  });
 
   /* ============================================================
      4. Layer control (overlays only — single basemap, so no
@@ -317,9 +464,19 @@
   historicalTiles.forEach(({ label, instance }) => {
     overlays[label] = instance;
   });
-  overlays[CONFIG.geojson.label] = regionLayer;
+  regionLayers.forEach(({ label, layer }) => {
+    overlays[label] = layer;
+  });
 
   L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+
+  // Double rule between the tile-layer toggles and the GeoJSON toggles
+  const toggleRows = document.querySelectorAll('.leaflet-control-layers-overlays > label');
+  const firstGeoRow = toggleRows[historicalTiles.length];
+  if (historicalTiles.length && firstGeoRow) {
+    toggleRows[historicalTiles.length - 1].classList.add('group-end');
+    firstGeoRow.classList.add('group-start');
+  }
 
   /* ============================================================
      5. Opacity slider — drives every historical layer at once,
@@ -347,6 +504,15 @@
     historicalTiles.forEach(({ instance }) => instance.setOpacity(opacity));
     document.getElementById('opacityValue').textContent = `${Math.round(opacity * 100)}%`;
   });
+
+  /* ============================================================
+     6. Legend behavior — clicks/scroll on it never move the map;
+        starts collapsed on phones so it doesn't cover the map
+     ============================================================ */
+  const legendEl = document.getElementById('legend');
+  L.DomEvent.disableClickPropagation(legendEl);
+  L.DomEvent.disableScrollPropagation(legendEl);
+  if (window.matchMedia('(max-width: 600px)').matches) legendEl.open = false;
 </script>
 
 </body>
